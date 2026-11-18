@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<title>5 банкны техникийн ба суурь шинжилгээ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1620; --panel:#161f2c; --panel2:#1c2635; --border:#2a3648;
+    --text:#e7edf5; --muted:#8b9bb0; --accent:#4f8ff0;
+    --up:#26a65b; --down:#e0455c; --gold:#e8b13a;
+    --font: 'Segoe UI', -apple-system, 'Noto Sans', Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);}
+  header{padding:18px 26px 10px;border-bottom:1px solid var(--border);}
+  header h1{margin:0;font-size:20px;letter-spacing:.3px;}
+  header p{margin:4px 0 0;color:var(--muted);font-size:12.5px;}
+  .tabs{display:flex;gap:6px;padding:14px 26px 0;flex-wrap:wrap;}
+  .tab{padding:9px 18px;border-radius:8px 8px 0 0;background:var(--panel2);color:var(--muted);
+       cursor:pointer;font-size:14px;font-weight:600;border:1px solid var(--border);border-bottom:none;}
+  .tab.active{background:var(--panel);color:var(--text);border-color:var(--accent);}
+  .wrap{padding:0 26px 30px;background:var(--panel);border-top:2px solid var(--accent);}
+  .top-row{display:flex;gap:14px;padding:18px 0 6px;flex-wrap:wrap;align-items:baseline;}
+  .price-now{font-size:30px;font-weight:700;}
+  .price-chg{font-size:14px;font-weight:600;padding:3px 9px;border-radius:6px;}
+  .price-chg.up{color:var(--up);background:rgba(38,166,91,.15);}
+  .price-chg.down{color:var(--down);background:rgba(224,69,92,.15);}
+  .ma-legend{display:flex;gap:16px;font-size:13px;color:var(--muted);margin-left:auto;}
+  .ma-legend b{font-weight:700;}
+  .grid{display:grid;grid-template-columns:1fr 300px;gap:16px;}
+  .chartcol{min-width:0;}
+  #chart{width:100%;height:640px;}
+  .side{display:flex;flex-direction:column;gap:12px;}
+  .card{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .card h3{margin:0 0 10px;font-size:13.5px;letter-spacing:.4px;color:var(--text);text-transform:uppercase;}
+  .card ul{margin:0;padding-left:16px;color:#c7d2e0;font-size:13px;line-height:1.75;}
+  .scen{border-radius:8px;padding:9px 11px;margin-bottom:8px;font-size:12.5px;}
+  .scen b{display:block;font-size:13px;margin-bottom:3px;}
+  .scen.up{background:rgba(38,166,91,.14);border:1px solid rgba(38,166,91,.4);}
+  .scen.side{background:rgba(232,177,58,.14);border:1px solid rgba(232,177,58,.4);}
+  .scen.down{background:rgba(224,69,92,.14);border:1px solid rgba(224,69,92,.4);}
+  .scen .pct{float:right;}
+  .stars{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:8px;color:#c7d2e0;}
+  .stars span.gold{color:var(--gold);letter-spacing:1px;}
+  .bottom-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px;}
+  .lvl-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--border);color:#c7d2e0;}
+  .lvl-row b{color:var(--text);}
+  .fund-table{width:100%;border-collapse:collapse;margin-top:18px;font-size:13.5px;}
+  .fund-table th,.fund-table td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--border);}
+  .fund-table th:first-child,.fund-table td:first-child{text-align:left;}
+  .fund-table th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;}
+  .fund-table tr:hover{background:rgba(255,255,255,.03);}
+  .disclaimer{color:var(--muted);font-size:11.5px;margin-top:10px;line-height:1.6;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px;}
+  .footer-note{padding:16px 26px;color:var(--muted);font-size:11.5px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>МХБ-д бүртгэлтэй 5 банкны техникийн ба суурь үнэлгээний шинжилгээ</h1>
+  <p>Эх сурвалж: МХБ-ийн арилжааны түүх (өдрийн OHLC, автоматаар шинэчлэгддэг) + Есөн банк шинжилгээ.xlsx + ҮЦТХТ (нийт гаргасан хувьцаа). Интерактив: чирж томруулах, hover-ээр дэлгэрэнгүй.</p>
+  <p style="font-size:12px;color:var(--muted);">Сүүлд шинэчилсэн: <!--LAST_UPDATED--> &nbsp;·&nbsp; <a href="Есөн_банк_шинжилгээ.xlsx" style="color:var(--accent);">📥 Excel workbook татах</a></p>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<div class="wrap">
+  <div class="top-row">
+    <div>
+      <div class="price-now" id="priceNow">-</div>
+      <div id="priceDate" style="color:var(--muted);font-size:12px;"></div>
+    </div>
+    <span class="price-chg" id="priceChg"></span>
+    <div class="ma-legend">
+      <span style="color:#4f8ff0"><b>MA7</b> <span id="ma7v"></span></span>
+      <span style="color:#e0455c"><b>MA25</b> <span id="ma25v"></span></span>
+      <span style="color:#e8b13a"><b>MA99</b> <span id="ma99v"></span></span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="chartcol"><div id="chart"></div></div>
+    <div class="side">
+      <div class="card">
+        <h3>Smart Money Concepts</h3>
+        <ul id="smcList"></ul>
+      </div>
+      <div class="card">
+        <h3>Wyckoff шат <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px;">(ойролцоо тооцоо)</span></h3>
+        <div id="wyckoffBody" style="font-size:12.5px;color:#c7d2e0;line-height:1.6;"></div>
+      </div>
+      <div class="card">
+        <h3>Техникийн дүгнэлт</h3>
+        <ul id="techList"></ul>
+      </div>
+      <div class="card">
+        <h3>Хувилбарууд (дараагийн 1–4 долоо хоногт)</h3>
+        <div class="scen up" id="scenUp"></div>
+        <div class="scen side" id="scenSide"></div>
+        <div class="scen down" id="scenDown"></div>
+      </div>
+      <div class="card">
+        <h3>Үнэлгээ</h3>
+        <div class="stars"><span>Чиг хандлага</span><span class="gold" id="starTrend"></span></div>
+        <div class="stars"><span>Хөдөлгөөний хүч</span><span class="gold" id="starMom"></span></div>
+        <div class="stars"><span>Эрсдэл (бага=аюулгүй)</span><span class="gold" id="starRisk"></span></div>
+        <div class="stars"><span>Өсөх боломж</span><span class="gold" id="starBreak"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-grid">
+    <div class="card"><h3 style="color:var(--accent)">Дэмжлэг (доод түвшин)</h3><div id="supList"></div></div>
+    <div class="card"><h3 style="color:var(--down)">Эсэргүүцэл (дээд түвшин)</h3><div id="resList"></div></div>
+    <div class="card"><h3>Гол техникийн үзүүлэлт</h3><div id="metricList"></div></div>
+    <div class="card"><h3>Тайлбар</h3>
+      <div class="disclaimer">Энэхүү шинжилгээ түүхэн өгөгдөл, техникийн үзүүлэлтэд тулгуурласан. Хувилбаруудын магадлал, Wyckoff шат нь техникийн дохионы эвлүүлгээс гаргасан ойролцоо тооцоо бөгөөд баталгаа биш. BOS/CHoCH нь тодорхой дүрэмт алгоритмаар тооцсон (swing structure), харин Elliott Wave долгионы тоолол нь мэргэжлийн шинжээч хоорондоо ч тохирдоггүй хэт субьектив шинжтэй тул энд тооцоогүй болно — худал итгэл төрүүлэхээс зайлсхийв. Хөрөнгө оруулалтын шийдвэрийг өөрийн эрсдэлээр гаргана уу.</div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:26px;color:var(--text);font-size:14px;letter-spacing:.4px;text-transform:uppercase;">5 банкны суурь үнэлгээний харьцуулалт (2026/06/30 санхүү, өнөөгийн ханш)</h3>
+  <table class="fund-table" id="fundTable"></table>
+</div>
+
+<div class="footer-note">Хийсэн: Claude · Excel workbook болон МХБ-ийн арилжааны түүхтэй шууд уялдаатай (өгөгдөл шууд оруулсан, дахин тооцоолол JS-ээр real-time хийгдэнэ).</div>
+
+<script>
+const PRICE = /*__PRICE_JSON__*/;
+const FUND = /*__FUND_JSON__*/;
+const BANKS = ['Төрийн банк','ХасБанк','ХХБ','Голомт','Хаан банк'];
+const TICKER = {'Төрийн банк':'SBM · 564','ХасБанк':'XAC · 568','ХХБ':'TDB · 567','Голомт':'GLMT · 562','Хаан банк':'KHAN · 563'};
+
+let chart = echarts.init(document.getElementById('chart'), null, {renderer:'canvas'});
+let currentBank = BANKS[0];
+
+function sma(arr, period){
+  const out = new Array(arr.length).fill(null);
+  let sum = 0;
+  for(let i=0;i<arr.length;i++){
+    sum += arr[i];
+    if(i>=period) sum -= arr[i-period];
+    if(i>=period-1) out[i] = sum/period;
+  }
+  return out;
+}
+function ema(arr, period){
+  const out = new Array(arr.length).fill(null);
+  const k = 2/(period+1);
+  let prev = null;
+  for(let i=0;i<arr.length;i++){
+    if(arr[i]==null){out[i]=prev;continue;}
+    prev = prev==null ? arr[i] : arr[i]*k + prev*(1-k);
+    out[i] = prev;
+  }
+  return out;
+}
+function rsi(closes, period=14){
+  const out = new Array(closes.length).fill(null);
+  let gains=[], losses=[];
+  for(let i=1;i<closes.length;i++){
+    const d = closes[i]-closes[i-1];
+    gains.push(Math.max(d,0)); losses.push(Math.max(-d,0));
+  }
+  for(let i=period;i<=gains.length;i++){
+    const g = gains.slice(i-period,i).reduce((a,b)=>a+b,0)/period;
+    const l = losses.slice(i-period,i).reduce((a,b)=>a+b,0)/period;
+    const rs = l===0 ? 100 : g/l;
+    out[i] = 100 - 100/(1+rs);
+  }
+  return out;
+}
+function macdCalc(closes){
+  const e12 = ema(closes,12), e26 = ema(closes,26);
+  const macdLine = closes.map((_,i)=> (e12[i]!=null && e26[i]!=null) ? e12[i]-e26[i] : null);
+  const signal = ema(macdLine.map(v=>v==null?0:v), 9);
+  const hist = macdLine.map((v,i)=> (v!=null && signal[i]!=null) ? v - signal[i] : null);
+  return {macdLine, signal, hist};
+}
+function findSR(highs, lows, window=5, lookback=300, n=6){
+  const nH = highs.length;
+  const start = Math.max(0, nH-lookback);
+  let levels = [];
+  for(let i=start+window;i<nH-window;i++){
+    let isHigh=true, isLow=true;
+    for(let k=i-window;k<=i+window;k++){
+      if(highs[k]>highs[i]) isHigh=false;
+      if(lows[k]<lows[i]) isLow=false;
+    }
+    if(isHigh) levels.push(highs[i]);
+    if(isLow) levels.push(lows[i]);
+  }
+  levels.sort((a,b)=>a-b);
+  if(levels.length===0) return [];
+  let clusters=[[levels[0]]];
+  for(let i=1;i<levels.length;i++){
+    const cur = clusters[clusters.length-1];
+    if(levels[i] <= cur[cur.length-1]*1.025) cur.push(levels[i]);
+    else clusters.push([levels[i]]);
+  }
+  let scored = clusters.map(c=>({v:c.reduce((a,b)=>a+b,0)/c.length, n:c.length}));
+  scored.sort((a,b)=>b.n-a.n);
+  scored = scored.slice(0,n).map(s=>s.v);
+  scored.sort((a,b)=>a-b);
+  return scored;
+}
+function fmt(v, d=2){ return v==null ? '-' : Number(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmt0(v){ return v==null ? '-' : Math.round(v).toLocaleString('en-US'); }
+function stars(n){ return '★'.repeat(n)+'☆'.repeat(5-n); }
+
+// ---------- Smart Money Concepts: swing structure, BOS/CHoCH, liquidity ----------
+function detectSwings(highs, lows, k=3){
+  const swings = [];
+  const n = highs.length;
+  for(let i=k;i<n-k;i++){
+    let isH=true, isL=true;
+    for(let j=i-k;j<=i+k;j++){
+      if(j===i) continue;
+      if(highs[j]>=highs[i]) isH=false;
+      if(lows[j]<=lows[i]) isL=false;
+    }
+    if(isH) swings.push({i, type:'H', price:highs[i]});
+    if(isL) swings.push({i, type:'L', price:lows[i]});
+  }
+  return swings;
+}
+function alternateSwings(swings){
+  let out = [];
+  for(const s of swings){
+    if(out.length===0){ out.push(s); continue; }
+    const last = out[out.length-1];
+    if(last.type===s.type){
+      if(s.type==='H' && s.price>last.price) out[out.length-1]=s;
+      if(s.type==='L' && s.price<last.price) out[out.length-1]=s;
+    } else out.push(s);
+  }
+  return out;
+}
+function classifyStructure(altSwings){
+  let lastH=null, lastL=null, trend=null;
+  const out=[];
+  for(const s of altSwings){
+    let label=null, event=null;
+    if(s.type==='H'){
+      if(lastH){
+        label = s.price>lastH.price ? 'HH':'LH';
+        if(label==='HH'){ event = trend==='down' ? 'CHoCH' : 'BOS'; trend='up'; }
+      }
+      lastH=s;
+    } else {
+      if(lastL){
+        label = s.price<lastL.price ? 'LL':'HL';
+        if(label==='LL'){ event = trend==='up' ? 'CHoCH' : 'BOS'; trend='down'; }
+      }
+      lastL=s;
+    }
+    out.push(Object.assign({}, s, {label, event}));
+  }
+  return out;
+}
+function liquidityZones(altSwings, tol=0.005){
+  const highs = altSwings.filter(s=>s.type==='H').slice(-14);
+  const lows = altSwings.filter(s=>s.type==='L').slice(-14);
+  function cluster(arr){
+    const seen = new Set(); const zones=[];
+    for(let i=0;i<arr.length;i++)
+      for(let j=i+1;j<arr.length;j++)
+        if(Math.abs(arr[i].price-arr[j].price)/arr[i].price < tol){
+          const key = Math.round((arr[i].price+arr[j].price)/2);
+          if(!seen.has(key)){ seen.add(key); zones.push({price:(arr[i].price+arr[j].price)/2, i:Math.max(arr[i].i,arr[j].i)}); }
+        }
+    return zones;
+  }
+  return {highLiq: cluster(highs), lowLiq: cluster(lows)};
+}
+
+// ---------- Wyckoff phase (heuristic, not algorithmically rigorous) ----------
+function wyckoffPhase(closes, highs, lows, vols, n=60){
+  n = Math.min(n, closes.length-1);
+  const rH = highs.slice(-n), rL = lows.slice(-n), rV = vols.slice(-n);
+  const rangeHigh = Math.max(...rH), rangeLow = Math.min(...rL);
+  const last = closes[closes.length-1];
+  const pos = (last-rangeLow)/(rangeHigh-rangeLow || 1);
+  const half = Math.floor(n/2);
+  const volFirst = rV.slice(0,half).reduce((a,b)=>a+b,0), volSecond = rV.slice(half).reduce((a,b)=>a+b,0);
+  const volTrend = volSecond > volFirst*1.15 ? 'нэмэгдэж' : (volSecond < volFirst*0.85 ? 'буурч' : 'тогтвортой');
+  const rangeFirst = Math.max(...rH.slice(0,half)) - Math.min(...rL.slice(0,half));
+  const rangeSecond = Math.max(...rH.slice(half)) - Math.min(...rL.slice(half));
+  const contracting = rangeSecond < rangeFirst*0.72;
+  let phase, desc;
+  if(pos<0.35 && contracting){ phase='Хуримтлал (Accumulation)'; desc='Үнэ сүүлийн '+n+' өдрийн доод хэсэгт хязгаарлагдмал хэлбэлзэлтэй.'; }
+  else if(pos>0.65 && contracting){ phase='Түгээлт (Distribution)'; desc='Үнэ сүүлийн '+n+' өдрийн дээд хэсэгт хязгаарлагдмал хэлбэлзэлтэй.'; }
+  else if(pos>0.6 && !contracting){ phase='Өсөлтийн үе (Markup)'; desc='Хүчтэй өсөлтийн трэнд, хэлбэлзлийн муж өргөсч байна.'; }
+  else if(pos<0.4 && !contracting){ phase='Уналтын үе (Markdown)'; desc='Хүчтэй уналтын трэнд, хэлбэлзлийн муж өргөсч байна.'; }
+  else { phase='Шилжилтийн үе'; desc='Тодорхой Wyckoff үе ялгагдахгүй байна.'; }
+  return {phase, desc, pos, volTrend};
+}
+
+function render(bank){
+  currentBank = bank;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.bank===bank));
+
+  const d = PRICE[bank];
+  const dates = d.date, opens=d.open, highs=d.high, lows=d.low, closes=d.close, vols=d.volume;
+  const n = dates.length;
+  const ma7 = sma(closes,7), ma25 = sma(closes,25), ma99 = sma(closes,99);
+  const rsiArr = rsi(closes,14);
+  const {macdLine, signal, hist} = macdCalc(closes);
+  const sr = findSR(highs, lows);
+
+  // ---- SMC: swings, BOS/CHoCH, liquidity ----
+  const rawSwings = detectSwings(highs, lows, 3);
+  const altSwings = alternateSwings(rawSwings);
+  const structure = classifyStructure(altSwings);
+  const events = structure.filter(s=>s.event).slice(-4);
+  const liq = liquidityZones(altSwings);
+
+  document.getElementById('smcList').innerHTML = events.length ? events.map(e=>{
+    const tag = e.event==='BOS' ? '<b style="color:#4f8ff0">BOS</b>' : '<b style="color:#e8b13a">CHoCH</b>';
+    const dir = e.type==='H' ? 'дээшээ' : 'доошоо';
+    return `<li>${tag} — ${dates[e.i]}, ${fmt0(e.price)}₮ (${dir} бүтэц эвдэрсэн)</li>`;
+  }).join('') : '<li>Тодорхой BOS/CHoCH олдсонгүй</li>';
+
+  // ---- Wyckoff (heuristic) ----
+  const wy = wyckoffPhase(closes, highs, lows, vols, 60);
+  document.getElementById('wyckoffBody').innerHTML = `<b style="color:var(--text);font-size:13.5px;">${wy.phase}</b><br/>${wy.desc}<br/>Эзлэхүүн сүүлийн үед ${wy.volTrend} байна.`;
+
+
+  const last = closes[n-1], prevClose = closes[n-2];
+  const chg = last - prevClose, chgPct = chg/prevClose*100;
+  document.getElementById('priceNow').textContent = fmt(last,1)+'₮';
+  document.getElementById('priceDate').textContent = `${TICKER[bank]}  ·  ${dates[n-1]}`;
+  const chgEl = document.getElementById('priceChg');
+  chgEl.textContent = (chg>=0?'▲ ':'▼ ')+fmt(Math.abs(chg),1)+' ('+fmt(Math.abs(chgPct),2)+'%)';
+  chgEl.className = 'price-chg ' + (chg>=0?'up':'down');
+  document.getElementById('ma7v').textContent = fmt(ma7[n-1]);
+  document.getElementById('ma25v').textContent = fmt(ma25[n-1]);
+  document.getElementById('ma99v').textContent = fmt(ma99[n-1]);
+
+  let supports = sr.filter(s=>s<last).sort((a,b)=>b-a).slice(0,3);
+  let resistances = sr.filter(s=>s>last).sort((a,b)=>a-b).slice(0,3);
+  while(supports.length<3) supports.push(supports.length===0 ? last*0.90 : supports[supports.length-1]*0.94);
+  while(resistances.length<3) resistances.push(resistances.length===0 ? last*1.10 : resistances[resistances.length-1]*1.06);
+
+  const lastRsi = rsiArr[n-1], lastMacd = macdLine[n-1], lastSignal = signal[n-1];
+  let score = 0;
+  if(last>ma7[n-1]) score++; if(ma7[n-1]>ma25[n-1]) score++; if(ma25[n-1]>ma99[n-1]) score++;
+  if(lastMacd>lastSignal) score++; if(lastRsi>=45 && lastRsi<=70) score++;
+  if(lastRsi<30) score--; if(lastRsi>75) score--; if(lastMacd<lastSignal) score--; if(ma7[n-1]<ma25[n-1]) score--;
+
+  let upP = Math.min(70,Math.max(15,40+score*8));
+  let downP = Math.min(60,Math.max(10,30-score*7));
+  let sideP = Math.max(10,100-upP-downP);
+  const tot = upP+downP+sideP;
+  upP=Math.round(upP/tot*100); downP=Math.round(downP/tot*100); sideP=100-upP-downP;
+
+  const trendStars = score>=3?5:score>=1?4:score>=-1?3:score>=-3?2:1;
+  const momStars = (lastMacd>lastSignal && lastRsi>55)?5:(lastMacd>lastSignal)?4:(lastRsi<35)?2:3;
+  const riskRaw = (lastRsi>75||lastRsi<20)?1:(lastRsi>68||lastRsi<28)?2:3;
+  const riskStars = 5-riskRaw+1;
+  const breakStars = ((resistances[0]-last)/last<0.03)?5:((resistances[0]-last)/last<0.06)?4:3;
+
+  document.getElementById('techList').innerHTML = `
+    <li>MA7 ${ma7[n-1]>ma25[n-1]?'&gt;':'&lt;'} MA25 ${ma25[n-1]>ma99[n-1]?'&gt;':'&lt;'} MA99</li>
+    <li>RSI ${lastRsi>=40&&lastRsi<=60?'дунд':(lastRsi>60?'өндөр':'бага')} түвшинд (${fmt0(lastRsi)})</li>
+    <li>MACD ${lastMacd>lastSignal?'эерэг':'сөрөг'} бүсэд</li>
+    <li>Үнэ ${fmt0(supports[0])}–${fmt0(resistances[0])}₮ хооронд хөдөлж байна</li>
+    <li>Давах ёстой түвшин: ${fmt0(resistances[0])}₮</li>`;
+
+  document.getElementById('scenUp').innerHTML = `<b>А. Өсөх хувилбар <span class="pct">${upP}%</span></b>${fmt0(resistances[0])}₮-г давж ${fmt0(resistances[1])}–${fmt0(resistances[2])}₮ хүрэх магадлал`;
+  document.getElementById('scenSide').innerHTML = `<b>Б. Хажуу хөдөлгөөн (тогтворжих) <span class="pct">${sideP}%</span></b>${fmt0(supports[0])}–${fmt0(resistances[0])}₮ хооронд ихээхэн өөрчлөгдөхгүй, хажуу тийш хэлбэлзэх магадлал`;
+  document.getElementById('scenDown').innerHTML = `<b>В. Буурах хувилбар <span class="pct">${downP}%</span></b>${fmt0(supports[0])}₮-г доош хаавал ${fmt0(supports[2])}–${fmt0(supports[1])}₮ хүртэл буурах магадлал`;
+
+  document.getElementById('starTrend').textContent = stars(trendStars);
+  document.getElementById('starMom').textContent = stars(momStars);
+  document.getElementById('starRisk').textContent = stars(riskStars);
+  document.getElementById('starBreak').textContent = stars(breakStars);
+
+  document.getElementById('supList').innerHTML = supports.map((s,i)=>
+    `<div class="lvl-row"><span>${i+1}-р дэмжлэг</span><b>${fmt0(s*0.98)} – ${fmt0(s)}₮</b></div>`).join('');
+  document.getElementById('resList').innerHTML = resistances.map((r,i)=>
+    `<div class="lvl-row"><span>${i+1}-р эсэргүүцэл</span><b>${fmt0(r)} – ${fmt0(r*1.02)}₮</b></div>`).join('');
+  document.getElementById('metricList').innerHTML = `
+    <div class="lvl-row"><span>MA7</span><b>${fmt(ma7[n-1])}</b></div>
+    <div class="lvl-row"><span>MA25</span><b>${fmt(ma25[n-1])}</b></div>
+    <div class="lvl-row"><span>MA99</span><b>${fmt(ma99[n-1])}</b></div>
+    <div class="lvl-row"><span>RSI(14)</span><b>${fmt(lastRsi)}</b></div>
+    <div class="lvl-row"><span>MACD</span><b>${fmt(lastMacd)}</b></div>
+    <div class="lvl-row"><span>Сигнал</span><b>${fmt(lastSignal)}</b></div>`;
+
+  // ---- ECharts option ----
+  const candleData = dates.map((_,i)=>[opens[i],closes[i],lows[i],highs[i]]);
+  const upColor = '#26a65b', downColor='#e0455c';
+
+  const markAreas = [
+    {name:'ТОМ ЭСЭРГҮҮЦЭЛ', y0:resistances[2]*0.995, y1:resistances[2]*1.03, color:'rgba(224,69,92,.16)'},
+    {name:'ДАРААГИЙН ЭСЭРГҮҮЦЭЛ', y0:resistances[1]*0.995, y1:resistances[1]*1.025, color:'rgba(224,69,92,.16)'},
+    {name:'ОЙРЫН ЭСЭРГҮҮЦЭЛ', y0:resistances[0]*0.995, y1:resistances[0]*1.02, color:'rgba(232,177,58,.18)'},
+    {name:'ДЭМЖЛЭГИЙН БҮС', y0:supports[0]*0.98, y1:supports[0]*1.005, color:'rgba(79,143,240,.16)'},
+    {name:'ХҮЧТЭЙ ДЭМЖЛЭГ', y0:supports[1]*0.975, y1:supports[1]*1.0, color:'rgba(79,143,240,.16)'},
+    {name:'ГОЛ ДЭМЖЛЭГ (MA99)', y0:supports[2]*0.965, y1:supports[2]*0.995, color:'rgba(38,166,91,.16)'},
+  ];
+
+  const option = {
+    backgroundColor:'transparent',
+    animation:false,
+    textStyle:{color:'#c7d2e0', fontFamily:'Segoe UI, sans-serif'},
+    grid:[
+      {left:60,right:20,top:20,height:'42%'},
+      {left:60,right:20,top:'46%',height:'12%'},
+      {left:60,right:20,top:'61%',height:'14%'},
+      {left:60,right:20,top:'79%',height:'16%'},
+    ],
+    axisPointer:{link:[{xAxisIndex:'all'}]},
+    xAxis:[
+      {type:'category',data:dates,gridIndex:0,axisLine:{lineStyle:{color:'#3a4863'}},splitLine:{show:false},axisLabel:{show:false},boundaryGap:true},
+      {type:'category',data:dates,gridIndex:1,axisLine:{lineStyle:{color:'#3a4863'}},splitLine:{show:false},axisLabel:{show:false},boundaryGap:true},
+      {type:'category',data:dates,gridIndex:2,axisLine:{lineStyle:{color:'#3a4863'}},splitLine:{show:false},axisLabel:{show:false},boundaryGap:true},
+      {type:'category',data:dates,gridIndex:3,axisLine:{lineStyle:{color:'#3a4863'}},splitLine:{show:false},axisLabel:{color:'#8b9bb0',fontSize:10},boundaryGap:true},
+    ],
+    yAxis:[
+      {scale:true,gridIndex:0,axisLabel:{color:'#8b9bb0',fontSize:10},splitLine:{lineStyle:{color:'#232e40'}}},
+      {scale:true,gridIndex:1,axisLabel:{show:false},splitLine:{show:false}},
+      {scale:true,gridIndex:2,min:0,max:100,axisLabel:{color:'#8b9bb0',fontSize:10},splitLine:{lineStyle:{color:'#232e40'}}},
+      {scale:true,gridIndex:3,axisLabel:{color:'#8b9bb0',fontSize:10},splitLine:{lineStyle:{color:'#232e40'}}},
+    ],
+    dataZoom:[
+      {type:'inside', xAxisIndex:[0,1,2,3], start:60, end:100},
+      {type:'slider', xAxisIndex:[0,1,2,3], top:'97%', height:14, textStyle:{color:'#8b9bb0'}},
+    ],
+    tooltip:{trigger:'axis',axisPointer:{type:'cross'},backgroundColor:'#1c2635',borderColor:'#3a4863',
+      textStyle:{color:'#e7edf5',fontSize:11},
+      formatter:function(params){
+        const i = params[0].dataIndex;
+        let s = `<b>${dates[i]}</b><br/>Нээлт: ${fmt(opens[i],1)}  Хаалт: ${fmt(closes[i],1)}<br/>Дээд: ${fmt(highs[i],1)}  Доод: ${fmt(lows[i],1)}<br/>Volume: ${fmt0(vols[i])}`;
+        if(ma7[i]!=null) s += `<br/>MA7: ${fmt(ma7[i])}  MA25: ${fmt(ma25[i])}`;
+        if(rsiArr[i]!=null) s += `<br/>RSI: ${fmt(rsiArr[i])}`;
+        return s;
+      }},
+    series:[
+      {type:'candlestick', data:candleData, xAxisIndex:0, yAxisIndex:0,
+        itemStyle:{color:upColor,color0:downColor,borderColor:upColor,borderColor0:downColor},
+        markArea:{silent:true, itemStyle:{}, data: markAreas.map(m=>[{yAxis:m.y0,itemStyle:{color:m.color}},{yAxis:m.y1}])},
+        markPoint:{symbol:'pin', symbolSize:38, data: events.map(e=>({
+            coord:[dates[e.i], e.price],
+            value: e.event,
+            itemStyle:{color: e.event==='CHoCH' ? '#e8b13a' : '#4f8ff0'},
+            label:{fontSize:9,color:'#0f1620',fontWeight:'bold'}
+          }))},
+        markLine:{silent:true,symbol:'none',
+          lineStyle:{type:'dotted',width:1,color:'#a35fd1'},
+          label:{show:true,formatter:'Liquidity',fontSize:8,color:'#a35fd1',position:'insideEndTop'},
+          data: [...liq.highLiq,...liq.lowLiq].map(z=>({yAxis:z.price}))}
+      },
+      {type:'line',data:ma7,xAxisIndex:0,yAxisIndex:0,showSymbol:false,lineStyle:{width:1.3,color:'#4f8ff0'}},
+      {type:'line',data:ma25,xAxisIndex:0,yAxisIndex:0,showSymbol:false,lineStyle:{width:1.3,color:'#e0455c'}},
+      {type:'line',data:ma99,xAxisIndex:0,yAxisIndex:0,showSymbol:false,lineStyle:{width:1.5,color:'#e8b13a',type:'dashed'}},
+      {type:'bar',data:vols.map((v,i)=>({value:v,itemStyle:{color: closes[i]>=opens[i]?upColor:downColor}})),xAxisIndex:1,yAxisIndex:1},
+      {type:'line',data:rsiArr,xAxisIndex:2,yAxisIndex:2,showSymbol:false,lineStyle:{width:1.3,color:'#a35fd1'},
+        markLine:{silent:true,symbol:'none',lineStyle:{type:'dashed',color:'#555'},data:[{yAxis:70,lineStyle:{color:'#e0455c'}},{yAxis:30,lineStyle:{color:'#8b9bb0'}},{yAxis:50}]}},
+      {type:'bar',data:hist.map(v=>({value:v,itemStyle:{color:v>=0?upColor:downColor}})),xAxisIndex:3,yAxisIndex:3,barWidth:'60%'},
+      {type:'line',data:macdLine,xAxisIndex:3,yAxisIndex:3,showSymbol:false,lineStyle:{width:1.2,color:'#4f8ff0'}},
+      {type:'line',data:signal,xAxisIndex:3,yAxisIndex:3,showSymbol:false,lineStyle:{width:1.2,color:'#e0455c'}},
+    ]
+  };
+  chart.setOption(option, true);
+}
+
+function renderFundTable(){
+  const rows = BANKS.map(b=>{
+    const f = FUND[b];
+    const last = PRICE[b].close[PRICE[b].close.length-1];
+    return `<tr><td>${b}</td><td>${fmt0(last)}₮</td><td>${fmt0(f.eps)}₮</td><td>${fmt0(f.bvps)}₮</td>
+      <td>${f.eps>0?(last/f.eps).toFixed(2)+'x':'—'}</td><td>${f.bvps>0?(last/f.bvps).toFixed(2)+'x':'—'}</td><td>${fmt0(f.ttm_profit)} сая₮</td><td>${fmt0(f.equity)} сая₮</td></tr>`;
+  }).join('');
+  document.getElementById('fundTable').innerHTML = `
+    <tr><th>Банк</th><th>Ханш</th><th>EPS (TTM)</th><th>BVPS</th><th>P/E</th><th>P/B</th><th>TTM цэвэр ашиг</th><th>Өөрийн хөрөнгө</th></tr>
+    ${rows}`;
+}
+
+const tabsEl = document.getElementById('tabs');
+BANKS.forEach(b=>{
+  const t = document.createElement('div');
+  t.className = 'tab'; t.textContent = b; t.dataset.bank = b;
+  t.onclick = ()=>render(b);
+  tabsEl.appendChild(t);
+});
+
+renderFundTable();
+render(BANKS[0]);
+window.addEventListener('resize', ()=>chart.resize());
+</script>
+</body>
+</html>
