@@ -1,0 +1,53 @@
+name: Update MSE bank dashboard
+
+on:
+  schedule:
+    # МХБ-ийн арилжаа ~11:00-14:00 (УБ цаг) явагддаг тул хаалтын дараа,
+    # 15:30 УБ цаг (UTC+8) = 07:30 UTC-д өдөр бүр (Даваа-Баасан) ажиллана.
+    - cron: '30 7 * * 1-5'
+  workflow_dispatch: {}   # "Run workflow" товчоор гараар ч ажиллуулж болно
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repo-write
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch latest prices from old.mse.mn
+        id: fetch
+        run: python3 scripts/fetch_prices.py
+        continue-on-error: true   # татахад алдаа гарвал ч хуучин сайтаа унтраахгүй
+
+      - name: Rebuild docs/index.html
+        run: python3 scripts/build_site.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "mse-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/price_data.json docs/index.html
+          git diff --cached --quiet || git commit -m "Auto-update: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash
+          git push
+
+      - name: Fail the run if fetch had errors
+        if: steps.fetch.outcome == 'failure'
+        run: |
+          echo "⚠️ fetch_prices.py алдаатай дууссан — old.mse.mn-ийн бүтэц өөрчлөгдсөн эсэхийг шалгана уу."
+          exit 1
