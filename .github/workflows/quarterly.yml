@@ -1,0 +1,78 @@
+name: Quarterly bank reports (auto-ingest + analysis)
+
+# Өдөр бүр open.mse.mn-ийг шалгана. Шинэ (эсвэл солигдсон аудитын) тайлан
+# байхгүй бол ~1 минутад дуусна, юу ч commit хийхгүй.
+on:
+  schedule:
+    - cron: '17 1 * * *'        # 09:17 УБ цаг (UTC+8) өдөр бүр
+  workflow_dispatch:
+    inputs:
+      force_analysis:
+        description: 'Шинэ тайлан байхгүй ч шинжилгээг дахин үүсгэх'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repo-write              # update.yml (ханш)-тай зэрэг push хийхээс сэргийлнэ
+  cancel-in-progress: false
+
+env:
+  WB: docs/Есөн_банк_шинжилгээ.xlsx
+  PIPE_ARGS: >-
+    --workbook docs/Есөн_банк_шинжилгээ.xlsx
+    --reports-dir reports --state state/report_state.json
+    --analysis-dir analysis --archive-dir archive
+    --prices data/price_data.json --fundamentals data/fundamentals.json
+
+jobs:
+  quarterly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Detect new reports
+        id: detect
+        run: python3 bank_pipeline/quarterly_pipeline.py $PIPE_ARGS --detect-only
+
+      - name: Install LibreOffice (recalc)
+        if: steps.detect.outputs.new == 'true' || inputs.force_analysis
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc fonts-dejavu >/dev/null
+
+      - name: Ingest + recalc + analysis
+        id: run
+        if: steps.detect.outputs.new == 'true' || inputs.force_analysis
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          EXTRA=""
+          if [ "${{ inputs.force_analysis }}" = "true" ]; then EXTRA="--force-analysis"; fi
+          python3 bank_pipeline/quarterly_pipeline.py $PIPE_ARGS $EXTRA
+
+      - name: Rebuild dashboard
+        if: steps.detect.outputs.new == 'true' || inputs.force_analysis
+        run: python3 scripts/build_site.py
+
+      - name: Commit and push
+        if: always() && (steps.detect.outputs.new == 'true' || inputs.force_analysis)
+        run: |
+          git config user.name "bank-report-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs data analysis reports state archive || true
+          git add -f docs/*_CANDIDATE.xlsx 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "Quarterly reports: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash
+          git push
