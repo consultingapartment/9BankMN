@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 fetch_prices.py — 5 банкны (SBM, XAC, TDB, GLMT, KHAN) арилжааны түүхийг
-old.mse.mn-ээс татаж, data/price_data.json-той нэгтгэнэ.
+open.mse.mn/securities-ээс татаж, data/price_data.json-той нэгтгэнэ.
 
 Компанийн ID (open.mse.mn/securities/{ID}) = ҮЦ код өөрөө:
     564 = Төрийн банк (SBM)
