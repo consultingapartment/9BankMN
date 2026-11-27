@@ -3,7 +3,7 @@
 fetch_prices.py — 5 банкны (SBM, XAC, TDB, GLMT, KHAN) арилжааны түүхийг
 old.mse.mn-ээс татаж, data/price_data.json-той нэгтгэнэ.
 
-Компанийн ID (old.mse.mn/mn/company/{ID}) = ҮЦ код өөрөө:
+Компанийн ID (open.mse.mn/securities/{ID}) = ҮЦ код өөрөө:
     564 = Төрийн банк (SBM)
     568 = ХасБанк (XAC)
     567 = ХХБ (TDB)
@@ -29,7 +29,7 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
-BASE_URL = "https://old.mse.mn"
+BASE_URL = "https://open.mse.mn/securities/"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_FILE = REPO_ROOT / "data" / "price_data.json"
 
